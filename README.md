@@ -1,5 +1,7 @@
 # Chess with Lightning Strikes
 
+**HOSTED LIVE: https://thunderchess.fly.dev/**
+
 A chess game a new mode: every few rounds, lightning strikes the board and stuns a piece for 3 turns. A storm cloud warns you one round ahead. There is also a Fog of War mode where you only see what your pieces can reach. Feel free to play in the browser against the computer, with a friend on the same device, or online against someone on another computer. A desktop version built with pygame shares the same engine.
 
 ![A lightning strike stuns the black knight on f6](docs/screenshots/lightning-strike.png)
