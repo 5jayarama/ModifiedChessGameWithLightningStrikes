@@ -861,7 +861,7 @@ function syncStartForm() {
     classic: "Standard chess rules.",
     lightning: "Every few rounds lightning stuns a piece for 3 turns. A storm cloud marks the square one round ahead.",
     fog: "You only see squares your pieces can move to. No check: capture the king to win." +
-      (mode === "ai" ? " The computer can see through the fog." : mode === "local" ? " The board is covered between turns." : ""),
+      (mode === "ai" ? " The computer only knows what it has seen, like you." : mode === "local" ? " The board is covered between turns." : ""),
   }[variant]!;
 }
 

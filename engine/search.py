@@ -5,7 +5,7 @@ Scores are negamax style: always from the point of view of the side to move.
 import random
 import time
 
-from .board import BLACK, EMPTY, EN_PASSANT, MATERIAL, PROMOTION, QUEEN
+from .board import BLACK, EMPTY, EN_PASSANT, KING, MATERIAL, PROMOTION, QUEEN
 
 MATE = 1_000_000
 INF = 10_000_000
@@ -111,6 +111,55 @@ class Searcher:
         # report white's perspective, like Board.evaluate()
         info["score"] = best_score if board.side != BLACK else -best_score
         return best, info
+
+    def score_moves(self, board, moves, margin=100):
+        """Score every move in `moves` (mover's point of view) instead of just finding the best one.
+        Each move gets a full search window, so the scores can be compared and averaged across
+        boards (the Fog of War AI does this over its guesses). Scores within `margin` of the best are
+        exact; a worse move's score is an upper bound that is still at least `margin` below the best.
+        A move that leaves the mover's king attacked scores -MATE: in Fog of War that king gets captured.
+
+        Returns ({move: score}, depth) from the deepest depth that finished. Depth 1 always finishes."""
+        b = board.copy()
+        self.game_history = set()
+        self.root_bonus = None
+        self.path = []
+        start = time.perf_counter()
+        self.deadline = start + self.time_limit
+        self.can_stop = False
+        self.killers = [[None, None] for _ in range(128)]
+        self.history = {}
+        side = b.side
+        order = list(moves)
+        self.rng.shuffle(order)
+        scores, done = {}, 0
+        for depth in range(1, self.max_depth + 1):
+            current = {}
+            try:
+                best = -INF
+                for m in order:
+                    if abs(b.sq[m[1]]) == KING:
+                        current[m] = best = MATE   # taking the king wins on the spot
+                        continue
+                    b.make(m)
+                    if b.is_attacked(b.king[side], -side):
+                        s = -MATE
+                    else:
+                        # Exact within `margin` of the best move so far; anything worse only needs
+                        # to be known as "at least margin worse", which is much cheaper to prove
+                        alpha = best - margin if best > -INF else -INF
+                        s = -self._negamax(b, depth - 1, -INF, -alpha, 1)
+                    b.unmake()
+                    current[m] = s
+                    best = max(best, s)
+            except TimeUp:
+                break   # the board copy is mid-search now; it is not used again
+            scores, done = current, depth
+            self.can_stop = True
+            order.sort(key=lambda m: -current[m])   # best first helps the next depth
+            if time.perf_counter() - start > self.time_limit * 0.4:
+                break
+        return scores, done
 
     # ------------------------------------------------------------------ search
 

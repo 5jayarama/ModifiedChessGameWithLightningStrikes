@@ -237,3 +237,123 @@ def test_finished_fog_game_survives_save_and_reload(client):
 def test_strict_loading_still_rejects_missing_kings():
     with pytest.raises(ValueError):
         Board("8/8/8/8/8/8/8/4k3 w - - 0 1")
+
+
+# ---------------------------------------------------------------------- fog of war: a fair computer
+
+from collections import Counter
+
+from engine import fog_ai
+from engine.board import EMPTY, KING, PAWN
+
+
+def fog_ai_position(seed, plies=12):
+    """A fog game against the computer (black), stopped on the computer's turn."""
+    rng = random.Random(seed)
+    g = fog("ai", difficulty=1, player_color="white", rng=random.Random(seed))
+    while len(g.history) < plies and g.status == "playing":
+        legal = g.state(viewer="white")["legal_moves"]
+        frm = rng.choice(sorted(legal))
+        g.move(frm, rng.choice(legal[frm]))
+        g.ai_move(max_seconds=0.05)
+    legal = g.state(viewer="white")["legal_moves"] if g.status == "playing" else {}
+    if legal:
+        frm = rng.choice(sorted(legal))
+        g.move(frm, rng.choice(legal[frm]))
+    boards = [Board.from_dict(s["board"]) for s in g.snapshots] + [g.board.copy()]
+    return g, boards
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_fog_ai_never_looks_at_hidden_squares(seed):
+    g, boards = fog_ai_position(seed)
+    if g.status != "playing":
+        pytest.skip("game ended early")
+    real = boards[-1]
+    seen = real.visible_squares(BLACK)
+    hidden_white = [s for s in SQUARES if s not in seen and real.sq[s] > 0 and real.sq[s] != KING]
+    if not hidden_white:
+        pytest.skip("nothing hidden")
+    # Move one hidden white piece to another hidden square; black's view must stay identical
+    moved = None
+    for frm in hidden_white:
+        for to in SQUARES:
+            if to in seen or real.sq[to] != EMPTY or (abs(real.sq[frm]) == PAWN and not 31 <= to <= 88):
+                continue
+            alt = real.copy()
+            alt.sq[to], alt.sq[frm] = alt.sq[frm], EMPTY
+            alt._recompute()
+            if (alt.visible_squares(BLACK) == seen and not alt.is_attacked(to, BLACK)
+                    and alt.pseudo_moves(fog=True) == real.pseudo_moves(fog=True)):
+                moved = alt
+                break
+        if moved:
+            break
+    assert moved is not None
+    a = fog_ai.choose_move(boards, BLACK, 1, 0.3, random.Random(7))
+    b = fog_ai.choose_move(boards[:-1] + [moved], BLACK, 1, 0.3, random.Random(7))
+    assert a[0] == b[0] and a[1]["guesses"] == b[1]["guesses"]
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_fog_ai_guesses_fit_what_it_can_see(seed):
+    g, boards = fog_ai_position(seed, plies=10)
+    if g.status != "playing":
+        pytest.skip("game ended early")
+    real = boards[-1]
+    memory, seen = fog_ai.build_memory(boards, BLACK)
+    real_white = Counter(abs(p) for p in real.sq if 0 < p < 99)
+    for i in range(10):
+        guess = fog_ai.guess_board(real, BLACK, memory, seen, len(boards) - 1, random.Random(i))
+        assert guess is not None
+        for s in SQUARES:
+            if s in seen:
+                assert guess.sq[s] == real.sq[s]          # what it sees is exact
+            elif guess.sq[s] > 0:
+                assert not guess.is_attacked(s, BLACK)    # a hidden piece there would be visible
+                if guess.sq[s] == PAWN:
+                    assert 31 <= s <= 88
+            assert guess.sq[s] >= 0 or real.sq[s] < 0     # its own pieces are never guessed
+        guess_white = Counter(abs(p) for p in guess.sq if 0 < p < 99)
+        # Same material, except a hidden promotion that it still counts as a pawn
+        assert guess_white[KING] == 1
+        assert sum(guess_white.values()) == sum(real_white.values())
+
+
+def test_fog_ai_counts_its_captures():
+    start = Board()
+    after = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")   # black took e2
+    captured = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1")
+    memory = fog_ai.Memory(BLACK, start)
+    memory.update(after, 1, Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"))
+    assert memory.alive[PAWN] == 7
+    memory.update(captured, 2, after)          # white moved: nothing counted
+    assert memory.alive[PAWN] == 7
+
+
+def test_fog_ai_remembers_the_start_position():
+    memory, _ = fog_ai.build_memory([Board()], BLACK)
+    assert memory.seen[sq("e1")] == (KING, 0) and len(memory.seen) == 16
+
+
+def boards_after(*moves):
+    boards = [Board()]
+    for m in moves:
+        b = boards[-1].copy()
+        frm, to = m.split("-")
+        b.make(b.find_move(sq(frm), sq(to)))
+        boards.append(b)
+    return boards
+
+
+def test_fog_ai_takes_a_free_queen_it_can_see():
+    boards = boards_after("e2-e4", "d7-d5", "d1-g4")       # the c8 bishop sees g4
+    move, info = fog_ai.choose_move(boards, BLACK, 2, 1.0, random.Random(1))
+    assert (square_name(move[0]), square_name(move[1])) == ("c8", "g4") and info["guesses"] == fog_ai.SAMPLES
+
+
+def test_fog_ai_through_the_game_and_api_speed():
+    g = fog("ai", difficulty=6, player_color="black", time_control="3+0", rng=random.Random(2))
+    g.ai_move()
+    assert len(g.history) == 1 and g.ai_info["guesses"] >= 1
+    assert g.ai_info["seconds"] < 180 / 30 + 1      # stays inside the clock budget

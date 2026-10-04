@@ -22,6 +22,7 @@ import time
 
 from .board import (BISHOP, BLACK, CASTLE, EMPTY, EN_PASSANT, KING, KNIGHT, PAWN, PIECE_TO_CHAR, PROMO_PIECE,
                     PROMOTION, QUEEN, ROOK, SQUARES, WHITE, ZOBRIST_EP, Board, parse_square, square_name)
+from . import fog_ai
 from .search import Searcher, pick_level
 
 MODES = ("ai", "local", "online")
@@ -168,12 +169,13 @@ class Game:
             # Don't lose on time: spend at most 1/30 of the remaining clock plus most of the increment
             budget = self.remaining(self.ai_color) / 1000 / 30 + TIME_CONTROLS[self.time_control][1] * 0.8
             max_seconds = max(0.05, min(max_seconds or budget, budget))
+        if self.variant == "fog":
+            # Fair play: the AI only uses what it has seen, never the real hidden squares
+            boards = [Board.from_dict(s["board"]) for s in self.snapshots] + [board]
+            move, info = fog_ai.choose_move(boards, ai_side, level, max_seconds, self.rng)
+            return move, dict(info, level=level)
         searcher = Searcher.for_level(level, max_seconds=max_seconds)
         move, info = searcher.best_move(board, history=set(self.hashes), root_bonus=self._forecast_bonus())
-        if move is None and self.variant == "fog":
-            # Every normal move loses the king; Fog of War still requires a move
-            fog_moves = board.pseudo_moves(fog=True)
-            move = fog_moves[0] if fog_moves else None
         return move, dict(info, level=level)
 
     def _forecast_bonus(self):
