@@ -1,6 +1,6 @@
 # Chess with Lightning Strikes
 
-A chess game with a twist: every few rounds, lightning strikes the board and stuns a piece for 3 turns. A storm cloud warns you one round ahead. There is also a Fog of War mode where you only see what your pieces can reach. Play in the browser against the computer, with a friend on the same device, or online against someone on another computer. A desktop version built with pygame shares the same engine.
+A chess game a new mode: every few rounds, lightning strikes the board and stuns a piece for 3 turns. A storm cloud warns you one round ahead. There is also a Fog of War mode where you only see what your pieces can reach. Feel free to play in the browser against the computer, with a friend on the same device, or online against someone on another computer. A desktop version built with pygame shares the same engine.
 
 ![A lightning strike stuns the black knight on f6](docs/screenshots/lightning-strike.png)
 
@@ -9,13 +9,12 @@ A chess game with a twist: every few rounds, lightning strikes the board and stu
 - **Three game modes:** Classic (standard chess), Lightning, and Fog of War.
 - **Three ways to play:** vs the computer, two players on one device, or two players online with an invite link.
 - **Computer opponent:** 6 difficulty levels plus a dynamic level that adapts to how you're doing. You can play either color.
-- **Clocks:** no clock, or bullet, blitz and rapid presets from 1 | 0 to 30 | 0, with increments. The clock starts after white's first move.
+- **Clocks:** no clock, or bullet, blitz and rapid presets similar to chess.com modes
 - **Full chess rules:** castling, en passant, promotion to any piece, and every draw rule (stalemate, threefold repetition, 50-move rule, insufficient material, timeout vs insufficient material). The game ends automatically, like on chess.com. Fog of War follows chess.com's Fog of War rules.
 - **Premoves:** queue your next move while your opponent thinks. It plays the moment your turn starts, or is dropped if it isn't legal by then.
 - **Move history:** click any move, or use the arrow keys, to see that position.
 - **Undo:** against the computer only, and only if takebacks are switched on before the game.
 - **Resign:** with a confirmation click.
-- **Works on phones:** the layout adapts down to a 390 px wide screen.
 
 ## Lightning rules
 
@@ -44,104 +43,45 @@ A chess game with a twist: every few rounds, lightning strikes the board and stu
 
 ![Fog of War, white's view: only squares white's pieces can reach are visible](docs/screenshots/fog-of-war.png)
 
-## Quick start
-
-You need Python 3.10+ and Node.js 18+. Run everything from the project folder.
-
-```bash
-# 1. Python setup (about 1 minute)
+## How to run
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# 2. Build the web frontend (about 30 seconds; repeat after changing files in web/)
 cd web
 npm install
 npm run build
 cd ..
-
-# 3. Start the server
 python -m flask --app server.app run
-```
-
-Open http://127.0.0.1:5000. To try online play on one computer, start an online game and open the invite link in a private window.
-
-If port 5000 is taken (macOS uses it for AirPlay), add `--port 5001` to the last command.
-
-### Desktop version
-
-```bash
-pip install pygame
-python -m pygame_client.game
-```
-
-It uses the bundled maestro pieces. To use your own, put images in `pygame_client/images1/` (`wK.png`, `bQ.png`, and so on); they take priority. The window has a side panel with the clocks, the move list, and Undo / Resign / New game buttons. Arrow keys, Home and End review moves; U undoes; Esc or right-click cancels a premove; N starts a new game once one ends.
-
-The web board also uses maestro. To swap in your own set, put PNGs with the same names in `web/src/pieces/` and rebuild; PNGs take priority over the bundled SVGs.
-
-### Frontend development
-
-```bash
-python -m flask --app server.app run      # terminal 1: API on :5000
-cd web && npm run dev                     # terminal 2: http://localhost:5173 with hot reload
-```
-
-## Deploying
-
-The `Dockerfile` builds the frontend and runs the server with gunicorn as an unprivileged user. Any host that runs Docker images works. Two options:
-
-### Render (free, simplest)
-
-1. Push the project to a GitHub repository.
-2. On [render.com](https://render.com), choose **New > Web Service**, connect the repository, and pick the **Free** instance type. Render finds the Dockerfile on its own.
-3. Under **Advanced**, set the health check path to `/healthz`. No environment variables are required.
-4. Create the service. The first build takes a few minutes, then the game is live at `https://<name>.onrender.com`.
-
-On the free plan the service sleeps after 15 minutes without visitors, and the next visitor waits about a minute while it wakes. Free services have no persistent disk, so games in progress are lost when it sleeps or redeploys. For an always-on site that keeps games, use a paid instance and add a persistent disk mounted at `/data`.
-
-### Fly.io (always on, a few dollars a month)
-
-```bash
-fly auth login
-# set a unique app name in fly.toml first
-fly launch --copy-config --no-deploy
-fly volumes create chess_data --size 1 --region ewr
-fly deploy
-```
-
-`fly.toml` keeps one machine running (no cold starts), mounts the volume at `/data` so games survive restarts and deploys, and forces HTTPS.
-
-### Notes for any host
-
-- Run **one** instance. Games live in a SQLite file, so they can't be shared between machines. Within that machine, gunicorn's workers share the file safely.
-- Each waiting online player holds one thread. The defaults (2 workers × 32 threads) handle 64 at once; set `WEB_CONCURRENCY` and `GUNICORN_THREADS` to change that. Use about one worker per CPU core, because the AI's thinking is CPU-bound.
-- Rate limits are counted per worker unless `RATE_LIMIT_STORAGE_URI` points at Redis, so with 2 workers a client can get up to twice the configured limit.
-- The image sets `TRUST_PROXY_HOPS=1`, which is right for hosts that put one proxy in front of the app (Render and Fly both do), so rate limits see real client addresses.
-
-Without Docker, the equivalent is:
-
-```bash
-cd web && npm ci && npm run build && cd ..
-gunicorn -k gthread -w 2 --threads 32 --timeout 60 -b 0.0.0.0:8000 "server.app:create_app()"
-```
-
-gunicorn doesn't run on Windows; locally, the flask command in Quick start is all you need.
+LAST STEP! Open any browser to play the game at http://127.0.0.1:5000
 
 ## Project layout
 
 ```
 engine/          rules, AI and game flow, no UI code
   board.py       board, move generation, make/unmake, incremental evaluation
-  search.py      the AI: alpha-beta search with a time budget
+  search.py      the AI: alpha-beta search
   game.py        modes, variants, clocks, draw rules, resign, undo, lightning, fog views, save/load
-  tables.py      piece-square tables for the evaluation
+  tables.py      heauristics for each piece's placement evaluation done by ai
 server/          Flask API and SQLite game storage
-web/             TypeScript frontend (Vite), maestro SVGs in src/pieces/
-pygame_client/   desktop version (bundled maestro PNGs in pieces/)
-tests/           167 tests: rules, AI, game flow, Fog of War views, API
-docs/            screenshots
-Dockerfile       production image (frontend build + gunicorn, non-root)
-fly.toml         Fly.io configuration
+  app.py
+  store.py
+web/             TypeScript frontend with index.html
+  dist/
+    index.html
+  src/
+    api.ts
+    main.ts      
+    stlyes.css   Just the css styling for the website
+tests/           Each file tests one aspect of the game
+  conftest.py
+  test_api.py
+  test_engine.py
+  test_game.py
+  test_rules.py
+  test_search.py
+  test_variants.py
+Dockerfile       For docker
+fly.toml         Fly.io configuration to host online
 ```
 
 ## How it works
@@ -263,8 +203,7 @@ pytest                                    # about 30 seconds
 
 ## Known limits
 
-- No draw offers, and no undo in multiplayer (by design).
-- In Fog of War, the computer sees the whole board.
+- No draw offers.
 - Online games without a clock that get abandoned simply expire after `GAME_TTL_HOURS`.
 - The AI runs inside the move request, so each worker process handles one AI move at a time.
 
@@ -277,7 +216,3 @@ pytest                                    # about 30 seconds
 | Reviewing an earlier move | Phone |
 |---|---|
 | ![Move review](docs/screenshots/move-review.png) | ![Phone layout](docs/screenshots/mobile.png) |
-
-## Credits
-
-Piece set: [maestro](https://github.com/lichess-org/lila/tree/master/public/piece/maestro) by sadsnake1, licensed [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). That license allows non-commercial use only, with attribution, and changes must be shared under the same license. The app shows the credit under the New game button. If you ever charge money or run ads, replace the pieces with a set that allows commercial use (for example lichess's cburnett, CC BY-SA 3.0).
