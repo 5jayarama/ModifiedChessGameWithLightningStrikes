@@ -1,0 +1,17 @@
+# Only engine/, server/, web/ and requirements.txt go into the image
+.git
+.github
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+data
+*.db
+*.db-wal
+*.db-shm
+web/node_modules
+web/dist
+docs
+tests
+pygame_client
+README.md

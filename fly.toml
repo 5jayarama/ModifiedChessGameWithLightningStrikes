@@ -1,0 +1,32 @@
+# Fly.io configuration. Change `app` to a unique name before the first deploy.
+app = "chess-lightning-CHANGE-ME"
+primary_region = "ewr"          # Newark, close to New York. List others with: fly platform regions
+
+[build]                         # builds from the Dockerfile in this folder
+
+[env]
+  CHESS_DB_PATH = "/data/chess.db"
+  TRUST_PROXY_HOPS = "1"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"    # stay awake: no cold start for the first visitor
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/healthz"
+
+# Games survive restarts and deploys on this volume. Create it once with:
+#   fly volumes create chess_data --size 1 --region ewr
+[[mounts]]
+  source = "chess_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

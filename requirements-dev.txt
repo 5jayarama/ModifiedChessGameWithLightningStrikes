@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8
+chess==1.10.0   # reference move generator for the rules tests
+pygame>=2.5     # only for the local pygame client
