@@ -15,7 +15,7 @@ A chess game a new mode: every few rounds, lightning strikes the board and stuns
 - **Full chess rules:** castling, en passant, promotion to any piece, and every draw rule (stalemate, threefold repetition, 50-move rule, insufficient material, timeout vs insufficient material). The game ends automatically, like on chess.com. Fog of War follows chess.com's Fog of War rules.
 - **Premoves:** queue your next move while your opponent thinks. It plays the moment your turn starts, or is dropped if it isn't legal by then.
 - **Move history:** click any move, or use the arrow keys, to see that position.
-- **Undo:** against the computer only, and only if takebacks are switched on before the game.
+- **Undo:** against the computer only, and only if undos are switched on before the game.
 - **Resign:** with a confirmation click.
 
 ## Lightning rules
@@ -23,7 +23,7 @@ A chess game a new mode: every few rounds, lightning strikes the board and stuns
 - Lightning strikes after every N full rounds (one white move plus one black move). You pick N, from 5 to 50, before the game.
 - **Forecast:** one round before each strike, a storm cloud appears over a random occupied square. Each player then gets one move before it lands.
 - The strike hits whatever stands on that square when it lands: the original piece, a piece that moved there, or nothing if the square is empty. Step away to dodge it, or lure an enemy piece onto it.
-- A stunned piece can't move or capture, and it doesn't give check or guard squares. It shows a ⚡ badge with the turns left.
+- A stunned piece can't move or capture, and it doesn't give check or guard squares. It shows a stunned icon with the turns left.
 - A stun lasts 3 full rounds. Capturing a stunned piece removes the stun with it.
 - A stunned rook or king can't castle.
 - If a strike leaves a player with no legal moves and their king isn't in check, the game is a stalemate.
